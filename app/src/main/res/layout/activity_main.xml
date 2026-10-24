@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="#121212">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Hozin BombSquad Mod"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:textColor="#4CAF50" />
+
+    <TextView
+        android:id="@+id/tvRoot"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Root: belum dicek"
+        android:textColor="#E0E0E0" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Package game:"
+        android:textColor="#9E9E9E" />
+
+    <EditText
+        android:id="@+id/etPackage"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="net.froemling.bombsquad"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#616161"
+        android:inputType="text" />
+
+    <TextView
+        android:id="@+id/tvGame"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Info game: -"
+        android:textColor="#9E9E9E" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btnInject"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="LAUNCH + INJECT" />
+
+        <Button
+            android:id="@+id/btnOverlay"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="OVERLAY" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/btnExit"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Keluar &amp; bersihkan jejak" />
+
+    <Switch
+        android:id="@+id/swAutoInject"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Auto-inject saat game dibuka"
+        android:textColor="#E0E0E0"
+        android:checked="true" />
+
+    <TextView
+        android:id="@+id/tvOverlayWarn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Izin &quot;Tampil di atas aplikasi lain&quot; belum aktif.\nCara aktifkan: Pengaturan → Aplikasi → Hozin BombSquad Mod → Tampil di atas aplikasi lain → Izinkan.\nTanpa ini logo mod menu tidak bisa muncul di atas game."
+        android:textColor="#FF8A65"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Status pola: -"
+        android:textColor="#FFC107" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Log:"
+        android:textColor="#9E9E9E" />
+
+    <ScrollView
+        android:id="@+id/svLog"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="4dp"
+        android:background="#1E1E1E">
+
+        <TextView
+            android:id="@+id/tvLog"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="8dp"
+            android:textColor="#B0BEC5"
+            android:textSize="12sp"
+            android:fontFamily="monospace" />
+    </ScrollView>
+</LinearLayout>

@@ -1,0 +1,27 @@
+# Gradle / build
+.gradle/
+build/
+app/build/
+local.properties
+*.iml
+
+# APK & signing (jangan pernah push binary rilis)
+*.apk
+*.apks
+*.aab
+*.keystore
+*.jks
+
+# File game proprietary (APK game, hasil ekstrak, source game) — JANGAN push
+*.so
+!/app/src/main/cpp/**
+BombSquad*.apk
+BombSquad*.apks
+
+# OS
+.DS_Store
+Thumbs.db
+
+# CI / log lokal
+*.log
+ci_log.md
