@@ -58,56 +58,48 @@ jobs:
           python3 -c "import zipfile,sys; z=zipfile.ZipFile(sys.argv[1]); print('zip valid, entri:', len(z.namelist()))" "$APK"
           ls -l "$APK"
 
-      - name: Buat Release v1.1 + upload APK
+      - name: Buat Release v1.2 + upload APK
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
-          cp "$APK" BombSquadMod-v1.1.apk
+          cp "$APK" BombSquadMod-v1.2.apk
           cat > release-notes.md <<'EOF'
-          # Hozin BombSquad Mod v1.1 🧪 EKSPERIMENTAL
+          # Hozin BombSquad Mod v1.2 🧪 EKSPERIMENTAL
 
           Aplikasi injector root (KernelSU) untuk BombSquad 1.8.4
           (`net.froemling.bombsquad`). Inject payload ke game yang sedang
           jalan — TANPA resign APK game (signature resmi tetap utuh).
 
           ## ⚠️ STATUS JUJUR — BACA DULU
-          - **Semua fitur v1.1 berlabel EKSPERIMENTAL.** Offset/pattern
+          - **Semua fitur v1.2 berlabel EKSPERIMENTAL.** Offset/pattern
             runtime `libmain.so` BELUM terverifikasi — butuh riset offset
             di HP root (libmain.so stripped, tanpa simbol debug).
-          - Yang v1.1 SUDAH lakukan nyata: inject + handshake status +
+          - Yang v1.2 SUDAH lakukan nyata: inject + handshake status +
             GATE SESI runtime (fail-closed, lihat bawah) + diagnostik gate.
             Toggle tidak akan aktif sampai pola fitur ditemukan di riset
             lanjutan.
           - **Jangan klaim fitur sudah jalan sebelum uji HP.**
 
-          ## Yang berubah di v1.1 (dari v1.0)
-          - **Pintu utama gate = Keamanan.java** (baru, gaya gate PvP mod
-            Billiard): satu boolean `isLocalSession(gamePid)` yang dievaluasi
-            via root dari `/proc/<pid>/net` game. Overlay + MainActivity
-            WAJIB konsultasi ke sana SEBELUM mengirim perintah toggle apa
-            pun; bila false, perintah tidak dikirim dan toggle dipaksa OFF.
-            Payload menyimpan backstop fail-closed sebagai jaring kedua.
-          - **Gate dipilah akun vs party:** koneksi sinkronisasi akun
-            (HTTPS/443, HTTP/80, DNS/53) diabaikan — tidak lagi memaksa
-            gate tertutup di menu utama lokal. Hanya koneksi peer/game
-            yang memaksa "online". File net yang tidak ada (mis. tcp6 di
-            kernel tanpa IPv6) dilewati, bukan tak-pasti. Fail-closed tetap:
-            data tak lengkap -> tak-pasti -> fitur OFF.
-          - **lib_size diperbaiki:** v1.0 melaporkan `lib_size: 0`. Kini
-            dihitung dari segmen PT_LOAD program header `libmain.so`
-            (fallback parsing `/proc/self/maps` berbuffer besar). Status
-            JSON + UI menampilkan `lib_size` + sumbernya — prasyarat
-            pattern-scan riset lanjutan.
-          - **Diagnostik gate:** status JSON membawa `gate_reason` (alasan
-            keputusan), `gate_conns` (ringkasan koneksi terlihat), dan
-            `tick` (bukti thread payload hidup) — tampil di UI.
-          - **Diet memori (keluhan lag v1.0):** log MainActivity dibatasi
-            200 baris terakhir (v1.0 append tanpa batas); polling status
-            overlay + WatchService + payload dilonggarkan ke 3 detik
-            (dulu 1-2 detik); UI hanya di-update bila nilai berubah;
-            tidak ada akumulasi string/list tanpa batas di service mana
-            pun. APK tetap kecil.
+          ## Yang berubah di v1.2 (dari v1.1) — LAYOUT PANEL SAJA
+          - **Panel floating kini MURNI fitur:** judul + tombol X + daftar
+            toggle saja (tinggi penuh panel + scroll). SEMUA teks status/
+            log (Inject, Gate, lib, Fitur) KELUAR dari panel.
+          - **Status/log pindah ke aplikasi utama:** MainActivity sudah
+            menampilkan status inject, keputusan gate + alasannya,
+            `lib_size` + sumbernya, tick, daftar fitur, dan log (maks
+            200 baris). Buka aplikasi utama untuk melihat status — bukan
+            lagi panel floating.
+          - **Switch tidak lagi kepotong tepi kanan:** tiap baris toggle
+            kini row horizontal (label weight 1 + Switch) dengan padding
+            kanan, sehingga switch muat penuh di dalam panel 280dp.
+          - **Akar cacat v1.0/v1.1 yang diperbaiki:** blok status kuning
+            (6 baris, apalagi baris "Fitur:" 13 fitur) dulu ditambahkan
+            ke layout luar SETELAH ScrollView sehingga memakan tinggi
+            panel dan menjepit area toggle sampai ~1 baris terlihat.
+            Blok itu kini tidak ada lagi di panel.
+          - TIDAK ADA perubahan gate, payload, pola, interval polling,
+            atau diet memori di v1.2 — murni layout panel.
 
           ## Fitur (menu overlay, semua default OFF)
           - God Mode, Speed (1.5x)
@@ -137,13 +129,15 @@ jobs:
           3. Buka game → auto-inject → logo "B" mengambang → tap → panel.
           4. Nyalakan toggle hanya saat main solo lokal.
           5. "Keluar & bersihkan jejak" untuk stop + hapus staging .so.
+          6. Status inject/gate/lib lihat di aplikasi utama, bukan panel.
 
           ## Yang masih menunggu
-          - Uji HP v1.1: gate membaca "lokal" di menu utama? `lib_size`
-            tampil > 0? Alasan gate tampil di UI? Toggle tetap OFF sampai
-            pola riset terisi (itu benar — bukan bug).
+          - Uji HP v1.2: panel kini murni toggle? Semua switch muat penuh
+            (tidak kepotong kanan)? Status/log tampil di aplikasi utama?
+            Toggle tetap OFF sampai pola riset terisi (itu benar — bukan
+            bug).
           - Riset offset runtime libmain.so per fitur (pattern-scan, bukan
             offset hardcode) — lihat `app/src/main/cpp/payload/patterns.h`.
           EOF
-          gh release view v1.1 >/dev/null 2>&1 && gh release delete v1.1 -y --cleanup-tag || true
-          gh release create v1.1 --title "Hozin BombSquad Mod v1.1" --notes-file release-notes.md BombSquadMod-v1.1.apk
+          gh release view v1.2 >/dev/null 2>&1 && gh release delete v1.2 -y --cleanup-tag || true
+          gh release create v1.2 --title "Hozin BombSquad Mod v1.2" --notes-file release-notes.md BombSquadMod-v1.2.apk

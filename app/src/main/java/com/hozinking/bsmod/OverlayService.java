@@ -43,6 +43,16 @@ import android.widget.Toast;
  * DIET v1.1: polling status 3 detik (dulu 1 detik) dan UI hanya di-update
  * bila nilai bermakna berubah (tick payload yang naik tiap siklus TIDAK
  * dihitung berubah) — tidak ada rebuild teks tiap tick.
+ *
+ * LAYOUT v1.2: panel floating MURNI fitur saja — judul + tombol X +
+ * daftar toggle (tinggi penuh panel + scroll). SEMUA teks status/log
+ * (Inject, Gate, lib, Fitur) KELUAR dari panel dan tampil di aplikasi
+ * utama (MainActivity) yang memang sudah menampilkan status + log.
+ * Di v1.0/v1.1 blok status kuning di bawah ScrollView memakan tinggi
+ * panel dan menjepit area toggle sampai ~1 baris, plus switch kepotong
+ * tepi kanan (panel 280dp tanpa padding kanan) — keduanya diperbaiki
+ * di v1.2: tiap baris toggle = row horizontal (label weight 1 + Switch)
+ * dengan padding kanan sehingga switch muat penuh di dalam panel.
  */
 public class OverlayService extends Service {
 
@@ -52,7 +62,6 @@ public class OverlayService extends Service {
     private static final String CH_ID = "bsmod_overlay";
     private static final int LOGO_DP = 48;
     private static final long POLL_MS = 3000; // diet v1.1 (dulu 1000)
-    private static final long NO_STATUS_WARN_MS = 5000;
 
     // Urutan kunci harus sama dengan daftar fitur di payload.
     private static final String[] KEYS = {
@@ -77,9 +86,9 @@ public class OverlayService extends Service {
     private View panelView;
     private Switch[] switches = new Switch[KEYS.length];
     private boolean[] st = new boolean[KEYS.length];
-    private TextView tvInject, tvGate, tvGateReason, tvLib, tvLibSize, tvFeatures;
-    private String lastSig = ""; // diet v1.1: skip update bila nilai sama
-    private String lastEmptyState = "";
+    // v1.2: panel MURNI fitur — tidak ada lagi TextView status/log di sini.
+    // Status + log tampil di MainActivity (tvStatus + tvLog).
+    private String lastGate = ""; // diet: hanya proses bila gate berubah
     private Handler handler;
     private Runnable poller;
     private boolean writing = false;
@@ -203,15 +212,6 @@ public class OverlayService extends Service {
         else showPanel();
     }
 
-    private TextView statusRow(LinearLayout parent, String label) {
-        TextView tv = new TextView(this);
-        tv.setText(label + ": -");
-        tv.setTextColor(0xFFFFC107);
-        tv.setTextSize(12);
-        parent.addView(tv);
-        return tv;
-    }
-
     private int keyIndex(String key) {
         for (int i = 0; i < KEYS.length; i++) if (KEYS[i].equals(key)) return i;
         return -1;
@@ -229,7 +229,7 @@ public class OverlayService extends Service {
         LinearLayout head = new LinearLayout(this);
         head.setOrientation(LinearLayout.HORIZONTAL);
         TextView title = new TextView(this);
-        title.setText("Hozin BombSquad Mod v1.1");
+        title.setText("Hozin BombSquad Mod v1.2");
         title.setTextColor(0xFF4CAF50);
         title.setTextSize(16);
         LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(
@@ -242,16 +242,9 @@ public class OverlayService extends Service {
         head.addView(btnX);
         lay.addView(head);
 
-        // Banner eksperimental — jujur, bukan klaim sudah jalan.
-        TextView warn = new TextView(this);
-        warn.setText("EKSPERIMENTAL — menunggu uji HP + riset offset.\n"
-                + "Toggle tidak akan aktif sampai pola ditemukan & sesi lokal terkonfirmasi.\n"
-                + "SOLO LOKAL SAJA (vs bot / satu perangkat). Online = fitur mati.");
-        warn.setTextColor(0xFFFF8A65);
-        warn.setTextSize(11);
-        warn.setPadding(0, dp(4), 0, dp(8));
-        lay.addView(warn);
-
+        // v1.2: panel MURNI fitur — judul + X + daftar toggle saja.
+        // Tidak ada banner, tidak ada blok status/log di panel.
+        // (Label 🧪 di tiap toggle tetap menandai status eksperimental.)
         ScrollView scroll = new ScrollView(this);
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
@@ -263,10 +256,22 @@ public class OverlayService extends Service {
 
         for (int i = 0; i < KEYS.length; i++) {
             final int idx = i;
+            // v1.2: tiap baris toggle = row horizontal (label weight 1 +
+            // Switch) dengan padding kanan — switch dijamin muat penuh
+            // di dalam panel, tidak kepotong tepi kanan (cacat v1.0/v1.1).
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setPadding(0, dp(2), dp(8), dp(2));
+            TextView lbl = new TextView(this);
+            lbl.setText(LABELS[i] + " 🧪");
+            lbl.setTextColor(0xFFFFFFFF);
+            lbl.setTextSize(14);
+            row.addView(lbl, new LinearLayout.LayoutParams(
+                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
             Switch sw = new Switch(this);
-            sw.setText(LABELS[i] + " 🧪");
-            sw.setTextColor(0xFFFFFFFF);
             sw.setChecked(st[i]);
+            sw.setMinWidth(0);
+            sw.setPadding(0, 0, dp(4), 0);
             sw.setOnCheckedChangeListener((v, on) -> {
                 if (updating) return;
                 st[idx] = on;
@@ -291,15 +296,9 @@ public class OverlayService extends Service {
                 pushCmd();
             });
             switches[i] = sw;
-            content.addView(sw);
+            row.addView(sw);
+            content.addView(row);
         }
-
-        tvInject = statusRow(lay, "Inject");
-        tvGate = statusRow(lay, "Gate sesi");
-        tvGateReason = statusRow(lay, "Alasan gate");
-        tvLib = statusRow(lay, "libmain.so");
-        tvLibSize = statusRow(lay, "Ukuran lib");
-        tvFeatures = statusRow(lay, "Fitur");
 
         panelView = lay;
         int sh2 = getResources().getDisplayMetrics().heightPixels;
@@ -338,7 +337,7 @@ public class OverlayService extends Service {
         }
         if (logoView != null) logoView.setVisibility(android.view.View.VISIBLE);
         switches = new Switch[KEYS.length];
-        tvInject = tvGate = tvGateReason = tvLib = tvLibSize = tvFeatures = null;
+        lastGate = "";
     }
 
     private WindowManager.LayoutParams overlayParams(int w, int h) {
@@ -430,16 +429,6 @@ public class OverlayService extends Service {
         return e > s ? js.substring(s, e) : "";
     }
 
-    private void setRow(TextView tv, String label, String val,
-                        String good, String bad) {
-        if (tv == null) return;
-        tv.setText(label + ": " + (val.isEmpty() ? "-" : val));
-        int color = 0xFFFFC107;
-        if (val.equals(good)) color = 0xFF4CAF50;
-        else if (val.equals(bad)) color = 0xFFF44336;
-        tv.setTextColor(color);
-    }
-
     private void refreshStatusNow() {
         new Thread(() -> {
             RootUtil.Result r = RootUtil.su("cat " + STATUS_PATH + " 2>/dev/null");
@@ -453,69 +442,21 @@ public class OverlayService extends Service {
         refreshStatusNow();
     }
 
-    private static String jnum(String js, String key) {
-        String pat = "\"" + key + "\":";
-        int i = js.indexOf(pat);
-        if (i < 0) return "";
-        int s = i + pat.length();
-        int e = s;
-        while (e < js.length() && Character.isDigit(js.charAt(e))) e++;
-        return e > s ? js.substring(s, e) : "";
-    }
-
-    private static String fmtBytes(String numStr) {
-        try {
-            long n = Long.parseLong(numStr);
-            if (n >= 1024 * 1024) {
-                return String.format(java.util.Locale.US, "%.1f MB", n / 1048576.0);
-            }
-            if (n >= 1024) return (n / 1024) + " KB";
-            return n + " B";
-        } catch (Exception e) {
-            return "-";
-        }
-    }
-
     private void applyStatus(String out) {
         if (!panelVisible) return;
+        // v1.2: panel TIDAK menampilkan status/log apa pun — polling ini
+        // hanya menjaga pertahanan berlapis: bila gate menutup (online /
+        // tak-pasti) sementara ada toggle ON, paksa semua toggle OFF di
+        // UI (payload backstop juga menolak di sisinya). Tampilan status
+        // lengkap ada di MainActivity (tvStatus + tvLog).
         if (out.isEmpty() || !out.contains("\"injected\":true")) {
-            long attempt = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    .getLong("inject_attempt_ms", 0);
-            long elapsed = attempt == 0 ? 0 : (System.currentTimeMillis() - attempt);
-            // Diet v1.1: jangan rebuild teks tiap poll bila keadaan sama.
-            String state = (attempt != 0 && elapsed >= NO_STATUS_WARN_MS)
-                    ? "fail" : "wait";
-            if (state.equals(lastEmptyState)) return;
-            lastEmptyState = state;
-            lastSig = "";
-            if ("fail".equals(state)) {
-                setRow(tvInject, "Inject", "payload tidak jalan — inject gagal",
-                        "", "payload tidak jalan — inject gagal");
-            } else {
-                setRow(tvInject, "Inject", "menunggu payload...", "", "");
-            }
-            setRow(tvGate, "Gate sesi", "-", "", "");
-            setRow(tvGateReason, "Alasan gate", "-", "", "");
-            setRow(tvLib, "libmain.so", "-", "", "");
-            setRow(tvLibSize, "Ukuran lib", "-", "", "");
-            setRow(tvFeatures, "Fitur", "-", "", "");
+            lastGate = "";
             return;
         }
-        // Diet v1.1: UI hanya di-update bila nilai bermakna berubah.
-        // Tick payload yang naik tiap siklus TIDAK dihitung berubah.
-        String sig = jval(out, "gate") + "|" + jval(out, "lib_base") + "|"
-                + jnum(out, "lib_size") + "|" + jval(out, "features") + "|"
-                + jval(out, "gate_reason");
-        if (sig.equals(lastSig)) return;
-        lastSig = sig;
-        lastEmptyState = "";
-        setRow(tvInject, "Inject", "OK", "OK", "");
         String gate = jval(out, "gate");
-        setRow(tvGate, "Gate sesi", gate, "lokal", "online");
-        setRow(tvGateReason, "Alasan gate", jval(out, "gate_reason"), "", "");
+        if (gate.equals(lastGate)) return;
+        lastGate = gate;
         if (gate.equals("online") || gate.equals("tak-pasti")) {
-            // Gate tertutup: paksa semua toggle OFF di UI (payload juga
-            // menolak permintaan ON di sisinya — pertahanan berlapis).
             boolean hadOn = false;
             for (boolean b : st) if (b) { hadOn = true; break; }
             if (hadOn) {
@@ -530,12 +471,6 @@ public class OverlayService extends Service {
         } else if (gate.equals("lokal")) {
             gateToastShown = false;
         }
-        setRow(tvLib, "libmain.so", jval(out, "lib_base").isEmpty()
-                ? "tidak ketemu" : "ketemu", "ketemu", "tidak ketemu");
-        setRow(tvLibSize, "Ukuran lib",
-                fmtBytes(jnum(out, "lib_size")) + " (" + jval(out, "lib_size_src") + ")",
-                "", "");
-        setRow(tvFeatures, "Fitur", jval(out, "features"), "", "");
     }
 
     private int dp(int v) {

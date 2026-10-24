@@ -4,18 +4,20 @@ Aplikasi Android **root** (pola HCR) untuk mod menu **BombSquad 1.8.4**
 (`net.froemling.bombsquad`, engine Ballistica C++ `libmain.so` + logika
 Python lokal).
 
-> ⚠️ **v1.1 = EKSPERIMENTAL.** Offset/pattern runtime `libmain.so` BELUM
-> terverifikasi — butuh riset offset di HP root. Yang v1.1 sudah lakukan
+> ⚠️ **v1.2 = EKSPERIMENTAL.** Offset/pattern runtime `libmain.so` BELUM
+> terverifikasi — butuh riset offset di HP root. Yang v1.2 sudah lakukan
 > nyata: inject + handshake status + **gate sesi (pintu utama
 > Keamanan.java)** + diagnostik gate + diet memori.
 > Toggle tidak akan aktif sampai pola fitur ditemukan di riset lanjutan.
 > Jangan klaim fitur sudah jalan sebelum uji HP.
 >
-> **Yang berubah di v1.1 (dari v1.0):** pintu utama gate pindah ke
-> `Keamanan.java` (boolean simpel gaya gate PvP Billiard); gate dipilah
-> akun vs party (sinkronisasi akun tidak lagi menutup gate di menu
-> utama); `lib_size` diperbaiki (v1.0: 0); polling dilonggarkan +
-> log dibatasi (diet memori, keluhan lag v1.0).
+> **Yang berubah di v1.2 (dari v1.1) — LAYOUT PANEL SAJA:** panel
+> floating kini MURNI fitur (judul + X + daftar toggle, tinggi penuh +
+> scroll); SEMUA teks status/log keluar dari panel → tampil di aplikasi
+> utama (MainActivity: status inject, gate + alasan, `lib_size` +
+> sumber, tick, fitur, log maks 200 baris). Switch tidak lagi kepotong
+> tepi kanan (baris toggle = label weight 1 + Switch + padding kanan).
+> Gate, payload, pola, polling, dan diet memori TIDAK berubah.
 
 ## Cara kerja
 
@@ -69,8 +71,9 @@ Keamanan berkata lokal. Tidak ada dua "gate utama" — satu pintu utama
 **Diagnostik (v1.1):** status JSON membawa `gate_reason` (alasan
 keputusan), `gate_conns` (ringkasan koneksi terlihat), `tick` (bukti
 thread payload hidup), dan `lib_size` + `lib_size_src` — semuanya tampil
-di UI (panel overlay + MainActivity) agar evaluasi gate bisa
-diverifikasi, bukan ditebak.
+di aplikasi utama (MainActivity) agar evaluasi gate bisa
+diverifikasi, bukan ditebak. Sejak v1.2 panel floating TIDAK lagi
+menampilkan status/log (panel murni fitur).
 
 ## Diet memori (v1.1, keluhan lag v1.0)
 
@@ -102,22 +105,23 @@ bypass pembelian / merugikan pemain asli.
 
 ## Yang masih menunggu
 
-1. **Uji HP v1.1**: gate membaca "lokal" di menu utama? `lib_size`
-   tampil > 0 (bukan 0)? Alasan gate tampil di UI? RAM/lag membaik vs
-   v1.0? (Toggle tetap OFF sampai pola riset terisi — itu benar, bukan
-   bug. Uji HP v1.0 24 Okt 20:50: inject OK, overlay muncul, gate
-   "tak-pasti", `lib_size: 0` — dua anomali itu yang diperbaiki v1.1.)
+1. **Uji HP v1.2 (layout panel):** panel kini murni toggle? Semua
+   switch muat penuh (tidak kepotong tepi kanan)? Status/log tampil di
+   aplikasi utama? (Toggle tetap OFF sampai pola riset terisi — itu
+   benar, bukan bug. Uji HP v1.0 24 Okt 20:50: inject OK, overlay
+   muncul, gate "tak-pasti", `lib_size: 0` — dua anomali itu yang
+   diperbaiki v1.1.)
 2. **Riset offset runtime** `libmain.so` per fitur — pattern-scan (bukan
    offset hardcode) agar tahan update game kecil. Slot + target riset
    didokumentasikan di `app/src/main/cpp/payload/patterns.h`.
-   **Tidak ada byte pattern yang dikarang di v1.1** — mengarang pola
+   **Tidak ada byte pattern yang dikarang di v1.2** — mengarang pola
    sama saja dengan toggle palsu.
 
 ## Build & rilis
 
 CI (`.github/workflows/build-release.yml`, repo publik = Actions gratis):
 JDK 17 Temurin + Gradle 8.7 + NDK 25.2.9519653 + CMake 3.22.1 →
-`assembleRelease` → Release `v1.1` + APK.
+`assembleRelease` → Release `v1.2` + APK.
 
 Signing rilis memakai keystore proyek yang disimpan sebagai GitHub
 Secrets repo (tidak pernah di-commit):
@@ -134,7 +138,7 @@ app/                  aplikasi (Java) + overlay + info versi game
 app/src/main/cpp/
   injector/           injector ptrace (libinjector.so, dijalankan via su)
   payload/            payload (libpayload.so)
-    patterns.h        registry slot pola — v1.1 SEMUA masih "menunggu-riset"
+    patterns.h        registry slot pola — v1.2 SEMUA masih "menunggu-riset"
     payload.cpp       cari libmain (+lib_size), backstop gate inline
                       (tiap 3 detik), loop cmd, status
     payload_probe.cpp probe minimal untuk isolasi masalah inject
