@@ -71,6 +71,8 @@ if(NOT dobby_POPULATED)
 endif()
 
 # Payload: di-load via dlopen oleh injector (mode root).
+# (v1.1: gate TIDAK di sini — pintu utama = Keamanan.java, backstop
+#  inline di payload.cpp. Tidak ada gate.cpp terpisah.)
 add_library(payload SHARED
     payload/payload.cpp
 )

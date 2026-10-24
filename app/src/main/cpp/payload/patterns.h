@@ -1,7 +1,7 @@
 #pragma once
-// Hozin BombSquad Mod v1.0 — registry slot pola libmain.so.
+// Hozin BombSquad Mod v1.1 — registry slot pola libmain.so.
 //
-// STATUS SEMUA SLOT DI v1.0: PATTERN_UNRESEARCHED.
+// STATUS SEMUA SLOT DI v1.1: PATTERN_UNRESEARCHED.
 // Alasan jujur: libmain.so (Ballistica, 28,7 MB) stripped tanpa simbol
 // debug; REA menyatakan riset offset runtime di HP root masih dibutuhkan.
 // TIDAK ADA byte pattern yang dikarang di file ini — mengarang pola sama
@@ -40,7 +40,7 @@
 #define PATTERN_UNRESEARCHED 0  // belum ada pola — fitur TIDAK diterapkan
 #define PATTERN_FOUND        1  // pola terverifikasi unik di build game
 
-// v1.0: semua slot belum diteliti. Fungsi ini satu-satunya sumber status
+// v1.1: semua slot belum diteliti. Fungsi ini satu-satunya sumber status
 // pola bagi payload; riset lanjutan mengubah tabel di bawah, bukan logika
 // apply di payload.cpp.
 static inline int bs_pattern_status(int feature_index) {

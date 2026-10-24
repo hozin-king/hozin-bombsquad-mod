@@ -29,14 +29,20 @@ import android.widget.Toast;
  * Hozin BombSquad Mod — mod menu klasik:
  * logo kecil floating (bisa di-drag) -> tap -> panel menu.
  *
- * SEMUA FITUR v1.0 BERLABEL EKSPERIMENTAL: offset runtime libmain.so
+ * SEMUA FITUR v1.1 BERLABEL EKSPERIMENTAL: offset runtime libmain.so
  * belum terverifikasi (butuh riset di HP root). Toggle TIDAK boleh ON
  * kalau payload belum jalan, gate sesi tertutup, atau pola fitur belum
  * ditemukan — guard ini ditegakkan di pushCmd() + di payload (fail-closed).
  *
- * GATE: satu boolean isLocalSession di payload. Sesi online (public party,
- * turnamen, apa pun yang nyambung pemain lain/server) ATAU jenis sesi tak
- * pasti -> SEMUA fitur dipaksa OFF, apa pun posisi toggle.
+ * GATE (v1.1): pintu utama = Keamanan.java (boolean isLocalSession,
+ * gaya gate PvP mod Billiard). Overlay WAJIB konsultasi ke sana SEBELUM
+ * mengirim perintah toggle apa pun (pushCmd): bila false, perintah
+ * TIDAK dikirim dan switch dipaksa OFF. Payload menyimpan backstop
+ * fail-closed sebagai jaring kedua (payload.cpp, tiap 3 detik).
+ *
+ * DIET v1.1: polling status 3 detik (dulu 1 detik) dan UI hanya di-update
+ * bila nilai bermakna berubah (tick payload yang naik tiap siklus TIDAK
+ * dihitung berubah) — tidak ada rebuild teks tiap tick.
  */
 public class OverlayService extends Service {
 
@@ -45,7 +51,7 @@ public class OverlayService extends Service {
     private static final String STATUS_PATH = "/data/local/tmp/bs_mod_status.json";
     private static final String CH_ID = "bsmod_overlay";
     private static final int LOGO_DP = 48;
-    private static final long POLL_MS = 1000;
+    private static final long POLL_MS = 3000; // diet v1.1 (dulu 1000)
     private static final long NO_STATUS_WARN_MS = 5000;
 
     // Urutan kunci harus sama dengan daftar fitur di payload.
@@ -71,7 +77,9 @@ public class OverlayService extends Service {
     private View panelView;
     private Switch[] switches = new Switch[KEYS.length];
     private boolean[] st = new boolean[KEYS.length];
-    private TextView tvInject, tvGate, tvLib, tvFeatures;
+    private TextView tvInject, tvGate, tvGateReason, tvLib, tvLibSize, tvFeatures;
+    private String lastSig = ""; // diet v1.1: skip update bila nilai sama
+    private String lastEmptyState = "";
     private Handler handler;
     private Runnable poller;
     private boolean writing = false;
@@ -221,7 +229,7 @@ public class OverlayService extends Service {
         LinearLayout head = new LinearLayout(this);
         head.setOrientation(LinearLayout.HORIZONTAL);
         TextView title = new TextView(this);
-        title.setText("Hozin BombSquad Mod v1.0");
+        title.setText("Hozin BombSquad Mod v1.1");
         title.setTextColor(0xFF4CAF50);
         title.setTextSize(16);
         LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(
@@ -288,7 +296,9 @@ public class OverlayService extends Service {
 
         tvInject = statusRow(lay, "Inject");
         tvGate = statusRow(lay, "Gate sesi");
+        tvGateReason = statusRow(lay, "Alasan gate");
         tvLib = statusRow(lay, "libmain.so");
+        tvLibSize = statusRow(lay, "Ukuran lib");
         tvFeatures = statusRow(lay, "Fitur");
 
         panelView = lay;
@@ -328,7 +338,7 @@ public class OverlayService extends Service {
         }
         if (logoView != null) logoView.setVisibility(android.view.View.VISIBLE);
         switches = new Switch[KEYS.length];
-        tvInject = tvGate = tvLib = tvFeatures = null;
+        tvInject = tvGate = tvGateReason = tvLib = tvLibSize = tvFeatures = null;
     }
 
     private WindowManager.LayoutParams overlayParams(int w, int h) {
@@ -367,6 +377,26 @@ public class OverlayService extends Service {
                     revertSwitches();
                 });
                 return;
+            }
+            // v1.1 PINTU UTAMA: konsultasi Keamanan.java SEBELUM kirim
+            // perintah toggle apa pun. Bila gate false, perintah TIDAK
+            // dikirim dan switch dipaksa OFF (payload backstop juga
+            // menolak di sisinya — pertahanan berlapis). Mematikan semua
+            // toggle selalu boleh (tidak perlu gate).
+            if (wantOn) {
+                String pkg = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                        .getString("package", "net.froemling.bombsquad");
+                Keamanan.Hasil h = Keamanan.cekSesiPaket(pkg);
+                if (!h.lokal) {
+                    writing = false;
+                    handler.post(() -> {
+                        Toast.makeText(OverlayService.this,
+                                "Gate Keamanan: " + h.alasan + " — toggle dipaksa OFF",
+                                Toast.LENGTH_SHORT).show();
+                        revertSwitches();
+                    });
+                    return;
+                }
             }
             StringBuilder sb = new StringBuilder("{");
             for (int i = 0; i < KEYS.length; i++) {
@@ -423,26 +453,66 @@ public class OverlayService extends Service {
         refreshStatusNow();
     }
 
+    private static String jnum(String js, String key) {
+        String pat = "\"" + key + "\":";
+        int i = js.indexOf(pat);
+        if (i < 0) return "";
+        int s = i + pat.length();
+        int e = s;
+        while (e < js.length() && Character.isDigit(js.charAt(e))) e++;
+        return e > s ? js.substring(s, e) : "";
+    }
+
+    private static String fmtBytes(String numStr) {
+        try {
+            long n = Long.parseLong(numStr);
+            if (n >= 1024 * 1024) {
+                return String.format(java.util.Locale.US, "%.1f MB", n / 1048576.0);
+            }
+            if (n >= 1024) return (n / 1024) + " KB";
+            return n + " B";
+        } catch (Exception e) {
+            return "-";
+        }
+    }
+
     private void applyStatus(String out) {
         if (!panelVisible) return;
         if (out.isEmpty() || !out.contains("\"injected\":true")) {
             long attempt = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                     .getLong("inject_attempt_ms", 0);
             long elapsed = attempt == 0 ? 0 : (System.currentTimeMillis() - attempt);
-            if (attempt != 0 && elapsed >= NO_STATUS_WARN_MS) {
+            // Diet v1.1: jangan rebuild teks tiap poll bila keadaan sama.
+            String state = (attempt != 0 && elapsed >= NO_STATUS_WARN_MS)
+                    ? "fail" : "wait";
+            if (state.equals(lastEmptyState)) return;
+            lastEmptyState = state;
+            lastSig = "";
+            if ("fail".equals(state)) {
                 setRow(tvInject, "Inject", "payload tidak jalan — inject gagal",
                         "", "payload tidak jalan — inject gagal");
             } else {
                 setRow(tvInject, "Inject", "menunggu payload...", "", "");
             }
             setRow(tvGate, "Gate sesi", "-", "", "");
+            setRow(tvGateReason, "Alasan gate", "-", "", "");
             setRow(tvLib, "libmain.so", "-", "", "");
+            setRow(tvLibSize, "Ukuran lib", "-", "", "");
             setRow(tvFeatures, "Fitur", "-", "", "");
             return;
         }
+        // Diet v1.1: UI hanya di-update bila nilai bermakna berubah.
+        // Tick payload yang naik tiap siklus TIDAK dihitung berubah.
+        String sig = jval(out, "gate") + "|" + jval(out, "lib_base") + "|"
+                + jnum(out, "lib_size") + "|" + jval(out, "features") + "|"
+                + jval(out, "gate_reason");
+        if (sig.equals(lastSig)) return;
+        lastSig = sig;
+        lastEmptyState = "";
         setRow(tvInject, "Inject", "OK", "OK", "");
         String gate = jval(out, "gate");
         setRow(tvGate, "Gate sesi", gate, "lokal", "online");
+        setRow(tvGateReason, "Alasan gate", jval(out, "gate_reason"), "", "");
         if (gate.equals("online") || gate.equals("tak-pasti")) {
             // Gate tertutup: paksa semua toggle OFF di UI (payload juga
             // menolak permintaan ON di sisinya — pertahanan berlapis).
@@ -462,6 +532,9 @@ public class OverlayService extends Service {
         }
         setRow(tvLib, "libmain.so", jval(out, "lib_base").isEmpty()
                 ? "tidak ketemu" : "ketemu", "ketemu", "tidak ketemu");
+        setRow(tvLibSize, "Ukuran lib",
+                fmtBytes(jnum(out, "lib_size")) + " (" + jval(out, "lib_size_src") + ")",
+                "", "");
         setRow(tvFeatures, "Fitur", jval(out, "features"), "", "");
     }
 

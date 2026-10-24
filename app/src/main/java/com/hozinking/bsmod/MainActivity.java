@@ -128,8 +128,11 @@ public class MainActivity extends Activity {
         if (r.statusJson != null && !r.statusJson.isEmpty()) {
             final String st = r.statusJson;
             runOnUiThread(() -> tvStatus.setText("Status:\n" + prettyStatus(st)));
-            if (st.contains("\"gate\":\"online\"") || st.contains("\"gate\":\"tak-pasti\"")) {
-                toast("Gate: sesi online/tak-pasti — semua fitur dipaksa OFF");
+            // v1.1 PINTU UTAMA: keputusan gate dari Keamanan.java, bukan
+            // dari status payload semata (payload hanya backstop).
+            Keamanan.Hasil h = Keamanan.cekSesiPaket(pkg);
+            if (!h.lokal) {
+                toast("Gate Keamanan: " + h.alasan + " — semua fitur dipaksa OFF");
             } else {
                 toast("Payload jalan — buka overlay untuk toggle");
             }
@@ -146,13 +149,41 @@ public class MainActivity extends Activity {
         return e > s ? js.substring(s, e) : "-";
     }
 
+    /** Ambil nilai numerik JSON sederhana: "key":123. */
+    private static String jnum(String js, String key) {
+        String pat = "\"" + key + "\":";
+        int i = js.indexOf(pat);
+        if (i < 0) return "";
+        int s = i + pat.length();
+        int e = s;
+        while (e < js.length() && Character.isDigit(js.charAt(e))) e++;
+        return e > s ? js.substring(s, e) : "";
+    }
+
+    private static String fmtBytes(String numStr) {
+        try {
+            long n = Long.parseLong(numStr);
+            if (n >= 1024 * 1024) {
+                return String.format(Locale.US, "%.1f MB", n / 1048576.0);
+            }
+            if (n >= 1024) return (n / 1024) + " KB";
+            return n + " B";
+        } catch (Exception e) {
+            return "-";
+        }
+    }
+
     /** Tampilkan status JSON handshake secara ringkas. */
     private static String prettyStatus(String json) {
         return "Inject: " + (json.contains("\"injected\":true") ? "OK" : "-")
                 + "\nGate sesi: " + jval(json, "gate")
                 + " | libmain.so: " + (json.contains("\"lib_found\":true") ? "ketemu" : "belum")
+                + "\nAlasan gate: " + jval(json, "gate_reason")
+                + "\nlib_size: " + fmtBytes(jnum(json, "lib_size"))
+                + " (" + jval(json, "lib_size_src") + ")"
                 + "\nFitur: " + jval(json, "features")
                 + "\nlib_base: " + jval(json, "lib_base")
+                + "\ntick: " + jnum(json, "tick")
                 + "\n" + jval(json, "note");
     }
 
@@ -263,10 +294,28 @@ public class MainActivity extends Activity {
         tvLoadingMsg = null;
     }
 
+    private static final int MAX_LOG_LINES = 200; // diet v1.1
+
     private void log(String s) {
         String t = new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
+        final String line = "[" + t + "] " + s + "\n";
         runOnUiThread(() -> {
-            tvLog.append("[" + t + "] " + s + "\n");
+            tvLog.append(line);
+            // Diet v1.1: JANGAN append tanpa batas (v1.0 membengkak).
+            // Simpan maks 200 baris terakhir, buang baris tertua.
+            CharSequence cs = tvLog.getText();
+            int total = 0;
+            for (int i = 0; i < cs.length(); i++) {
+                if (cs.charAt(i) == '\n') total++;
+            }
+            if (total > MAX_LOG_LINES) {
+                int cut = 0;
+                int drop = total - MAX_LOG_LINES;
+                for (int i = 0; i < cs.length() && drop > 0; i++) {
+                    if (cs.charAt(i) == '\n') { drop--; cut = i + 1; }
+                }
+                tvLog.setText(cs.subSequence(cut, cs.length()));
+            }
             svLog.post(() -> svLog.fullScroll(ScrollView.FOCUS_DOWN));
         });
     }

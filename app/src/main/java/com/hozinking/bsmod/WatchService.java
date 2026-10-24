@@ -15,7 +15,8 @@ import android.provider.Settings;
 import android.util.Log;
 
 /**
- * Auto-inject: polling tiap ~2 detik `pidof <package game>`.
+ * Auto-inject: polling tiap ~3 detik `pidof <package game>` (diet v1.1,
+ * dulu ~2 detik). Tanpa akumulasi: hanya flag + counter kecil.
  * - PID baru ketemu & belum di-inject -> inject otomatis -> overlay logo muncul.
  * - Game ditutup (pidof kosong) -> reset, overlay disembunyikan.
  *
@@ -26,7 +27,7 @@ public class WatchService extends Service {
 
     private static final String TAG = "BsMod";
     private static final String CH_ID = "bsmod_watch";
-    private static final long POLL_MS = 2000;
+    private static final long POLL_MS = 3000; // diet v1.1 (dulu 2000)
     private static final String DEFAULT_PKG = "net.froemling.bombsquad";
 
     private Handler handler;

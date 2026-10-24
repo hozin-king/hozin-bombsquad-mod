@@ -137,10 +137,11 @@ public final class ModInjector {
                 return new InjectResult(false, "", updateDetected, gameInfoLine,
                         "Game gagal dibuka otomatis.");
             }
-            // tunggu libmain.so ke-map sebelum inject
+            // tunggu libmain.so ke-map sebelum inject (diet v1.1: cek
+            // tiap 2 detik, total tetap ~10 detik — bukan tiap detik).
             L.log("Tunggu libmain.so dimuat...");
             boolean mapped = false;
-            for (int i = 0; i < 10; i++) {
+            for (int i = 0; i < 5; i++) {
                 RootUtil.Result c = RootUtil.su(
                         "grep -c libmain.so /proc/" + pid + "/maps 2>/dev/null");
                 if (c.code == 0) {
@@ -148,7 +149,7 @@ public final class ModInjector {
                         if (Integer.parseInt(c.out.trim()) > 0) { mapped = true; break; }
                     } catch (Exception ignored) { /* lanjut poll */ }
                 }
-                sleep1s();
+                try { Thread.sleep(2000); } catch (InterruptedException ignored) { /* abaikan */ }
             }
             if (!mapped) {
                 L.log("libmain.so belum terdeteksi — tunggu 3 detik lagi.");
@@ -261,15 +262,18 @@ public final class ModInjector {
         }
 
         // ---- tunggu status pola ----
+        // Diet v1.1: cek tiap 2 detik (dulu tiap detik), total tetap
+        // ~waitSecs detik.
         L.log("Tunggu status pola (maks " + waitSecs + " dtk)...");
-        for (int i = 0; i < waitSecs; i++) {
+        int checks = (waitSecs + 1) / 2;
+        for (int i = 0; i < checks; i++) {
             RootUtil.Result c = RootUtil.su("cat " + STATUS_PATH + " 2>/dev/null");
             if (c.code == 0 && !c.out.isEmpty() && c.out.contains("\"injected\":true")) {
                 L.log("Status: " + c.out);
                 return new InjectResult(true, c.out, updateDetected, gameInfoLine, null);
             }
             try {
-                Thread.sleep(1000);
+                Thread.sleep(2000);
             } catch (InterruptedException e) {
                 break;
             }
@@ -353,10 +357,11 @@ public final class ModInjector {
                     || t.contains("dlerror")) L.log("Probe: " + t);
         }
         boolean alive = false;
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < 3; i++) {
             RootUtil.Result c = RootUtil.su("cat " + PROBE_STATUS_PATH + " 2>/dev/null");
             if (c.code == 0 && c.out.contains("\"probe\":true")) { alive = true; break; }
-            sleep1s();
+            // Diet v1.1: cek tiap 2 detik (dulu tiap detik).
+            try { Thread.sleep(2000); } catch (InterruptedException ignored) { /* abaikan */ }
         }
         if (alive) {
             L.log("Probe: JALAN (dlopen+constructor OK)"
@@ -415,13 +420,14 @@ public final class ModInjector {
             L.log("Resolve activity gagal — pakai monkey.");
             RootUtil.su("monkey -p " + safe + " -c android.intent.category.LAUNCHER 1");
         }
-        for (int i = 0; i < 20; i++) {
+        for (int i = 0; i < 10; i++) {
             int pid = RootUtil.pidOf(safe);
             if (pid > 0) {
                 L.log("Game jalan (pid " + pid + ").");
                 return true;
             }
-            sleep1s();
+            // Diet v1.1: cek tiap 2 detik, total tetap ~20 detik.
+            try { Thread.sleep(2000); } catch (InterruptedException ignored) { /* abaikan */ }
         }
         return false;
     }
